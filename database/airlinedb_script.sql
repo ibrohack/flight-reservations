@@ -14,7 +14,7 @@ CREATE TABLE CUSTOMER (
     customerName VARCHAR (100),
     email VARCHAR (40), 
     phoneNumber VARCHAR (10),
-    route VARCHAR (100)
+    path VARCHAR (100)
 );
 
 CREATE TABLE FLIGHT (

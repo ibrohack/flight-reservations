@@ -1,3 +1,5 @@
+package models;
+
 import java.util.List;
 
 /**
@@ -6,7 +8,9 @@ import java.util.List;
  * Defines the contract for all customer related database operations, mainly CRUD operations
  * </p>
  *
- * @author Brayan, Ekaitz, Aritz
+ * @author Brayan
+ * @author Ekaitz
+ * @author Aritz
  * 
  */
 public interface CustomerDAO {
