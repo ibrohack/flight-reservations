@@ -1,0 +1,6 @@
+# Copy this file to config/db.properties and set your local MySQL 8.0 credentials.
+# config/db.properties is ignored by Git, so your password is never committed.
+# allowPublicKeyRetrieval and useSSL=false are only meant for a local server.
+db.url=jdbc:mysql://localhost:3306/airlinedb?allowPublicKeyRetrieval=true&useSSL=false
+db.user=your_user
+db.password=your_password

@@ -1,1 +1,5 @@
-bin/*
+# Compiled classes
+bin/
+
+# Local database credentials (copy config/db.properties.example to create it)
+config/db.properties
