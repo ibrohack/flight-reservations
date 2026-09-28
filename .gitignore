@@ -3,3 +3,9 @@ bin/
 
 # Local database credentials (copy config/db.properties.example to create it)
 config/db.properties
+
+# Local IDE Configuration IntelliJ, Eclipse, VSCode, Netbeans
+.idea/
+.vscode/
+.project
+.classpath
