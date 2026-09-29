@@ -1,7 +1,6 @@
 package flightreservations.service;
 
 import java.util.List;
-import java.util.Objects;
 
 import flightreservations.dao.CustomerDAO;
 import flightreservations.exception.DataAccessException;
@@ -26,7 +25,7 @@ public class CustomerService {
      * @param customerDao the customer data access object
      */
     public CustomerService(CustomerDAO customerDao) {
-        this.customerDao = Objects.requireNonNull(customerDao);
+        this.customerDao = customerDao;
     }
 
     /**
