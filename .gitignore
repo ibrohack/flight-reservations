@@ -9,3 +9,4 @@ config/db.properties
 .vscode/
 .project
 .classpath
+/nbproject/private/
