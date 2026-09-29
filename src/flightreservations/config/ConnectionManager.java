@@ -1,10 +1,8 @@
 package flightreservations.config;
 
 import java.io.File;
-import java.io.FileInputStream;
+import java.io.FileReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.Reader;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -108,7 +106,7 @@ public final class ConnectionManager {
                     + " to " + SETTINGS_FILE + " and set your MySQL credentials.");
         }
         Properties settings = new Properties();
-        try (Reader reader = new InputStreamReader(new FileInputStream(file), StandardCharsets.UTF_8)) {
+        try (FileReader reader = new FileReader(file, StandardCharsets.UTF_8)) {
             settings.load(reader);
         } catch (IOException e) {
             throw new DataAccessException("Cannot read the database settings in " + SETTINGS_FILE + ".", e);
