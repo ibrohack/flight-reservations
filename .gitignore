@@ -12,3 +12,6 @@ docs/javadoc/
 .vscode/
 .project
 .classpath
+/nbproject/
+build.xml
+manifest.mf
