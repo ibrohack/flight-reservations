@@ -29,8 +29,6 @@ views (console)  ──►  service (business rules)  ──►  dao (interfaces
   - `BusinessException` and its subclasses for broken rules: `ValidationException`, `EntityNotFoundException`, `FlightDepartedException`, `DuplicateBookingException` and `NoSeatsAvailableException`.
 - **util**: `InputValidator`, which holds every input rule.
 
-See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) for the full design.
-
 ## Requirements
 
 - JDK 17 or newer
@@ -61,7 +59,15 @@ See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) for the full desi
    java -cp "bin:lib/*" flightreservations.App
    ```
 
-   In VS Code you can also open `src/flightreservations/App.java` and click *Run*.
+## Javadoc
+
+The generated documentation is in `docs/javadoc/`; open `docs/javadoc/index.html`. To rebuild it after changing the code, run this from the project root (it works in PowerShell and Bash):
+
+```bash
+javadoc --release 17 -package -author -encoding UTF-8 -charset UTF-8 -docencoding UTF-8 -doctitle "Flight Reservations" -windowtitle "Flight Reservations" -d docs/javadoc -cp "lib/*" -sourcepath src -subpackages flightreservations
+```
+
+`-package` includes the package-private DAO implementations, which `DAOFactory` hides behind their interfaces.
 
 ## Sample data
 
@@ -105,29 +111,6 @@ A missing file means the customer has no bookings yet. The app creates the file 
 
 **Booking consistency.** A booking first takes a seat with one atomic `UPDATE ... WHERE seatAmount > 0`, so two bookings can't take the same last seat. It then appends the booking to the customer's file. If the file write fails, the app gives the seat back.
 
-## Manual verification checklist
-
-- [ ] The script runs without errors, and the tables have 5 airlines, 4 customers and 8 flights.
-- [ ] The DB rejects a duplicate IATA code, a flight with an unknown `airlineId`, and `seatAmount = -1`.
-- [ ] The seeder writes 36 bytes for customers 1 and 2, and 24 bytes for customer 3.
-- [ ] Register an airline. A duplicate IATA code (for example `IB`) shows a warning.
-- [ ] Register a customer. The new row has `path = data/customers/<id>/flights.dat`. A duplicate email shows a warning.
-- [ ] Register a flight. A past date, the same origin and destination, or 0 seats are re-prompted.
-- [ ] Check future flights. Airline names are shown.
-- [ ] Book flight 6 for customer 4:
-  - The booking works and flight 6's seats drop to 0.
-  - `data/customers/4/flights.dat` is created with 12 bytes.
-- [ ] Booking errors show a warning:
-  - flight 6 again (no seats);
-  - flight 4 for customer 1 (already booked);
-  - flight 1 (already departed);
-  - customer or flight 999 (does not exist).
-- [ ] Customer's flights and history show the split in the sample data table. Customer 4 shows "no past flights".
-- [ ] Letters in a number field, a bad date format, or an empty name are re-prompted.
-- [ ] With MySQL stopped (`MySQL80` service), a data option shows `[ERROR] Cannot connect...` and the menu keeps running.
-- [ ] With `config/db.properties` missing, a data option shows the setup message.
-- [ ] Ctrl+Z (Windows) or Ctrl+D (Linux/macOS) ends the app cleanly.
-
 ## Troubleshooting
 
 | Problem | Fix |
@@ -145,6 +128,7 @@ config/db.properties.example   template for the local credentials
 data/customers/<id>/flights.dat sample booking files
 database/airlinedb_script.sql  database creation + sample data
 docs/                          challenge statement, rubric, implementation plan
+docs/javadoc/                  generated Javadoc (open index.html)
 lib/                           MySQL Connector/J
 src/flightreservations/        App, SampleDataSeeder and the layer packages
 ```
