@@ -84,8 +84,12 @@ final class BookingDAOImpl implements BookingDAO {
     /** {@inheritDoc} */
     @Override
     public boolean exists(Customer customer, int flightId) throws DataAccessException {
-        return findByCustomer(customer).stream()
-                .anyMatch(booking -> booking.getFlightId() == flightId);
+        for (Booking booking : findByCustomer(customer)) {
+            if (booking.getFlightId() == flightId) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
