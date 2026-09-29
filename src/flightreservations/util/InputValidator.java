@@ -2,7 +2,6 @@ package flightreservations.util;
 
 import java.time.LocalDate;
 import java.util.Locale;
-import java.util.regex.Pattern;
 
 import flightreservations.exception.ValidationException;
 import flightreservations.model.TravelClass;
@@ -33,15 +32,9 @@ public final class InputValidator {
     /** How many years ahead a new flight can be scheduled. */
     public static final int MAX_YEARS_AHEAD = 1;
 
-    private static final Pattern IATA_CODE_PATTERN = Pattern.compile("^[A-Z0-9]{2}$");
-    private static final Pattern EMAIL_PATTERN = Pattern.compile("^[\\w.+-]+@[\\w-]+(\\.[\\w-]+)+$");
-    private static final Pattern PHONE_PATTERN = Pattern.compile("^\\+?[0-9 ]{9,20}$");
-
-    private static final String AIRLINE_NAME_FIELD = "Airline name";
-    private static final String CUSTOMER_NAME_FIELD = "Customer name";
-    private static final String COUNTRY_FIELD = "Country";
-    private static final String ORIGIN_FIELD = "Origin";
-    private static final String DESTINATION_FIELD = "Destination";
+    private static final String IATA_CODE_REGEX = "[A-Z0-9]{2}";
+    private static final String EMAIL_REGEX = "[\\w.+-]+@[\\w-]+(\\.[\\w-]+)+";
+    private static final String PHONE_REGEX = "\\+?[0-9 ]{9,20}";
 
     /** Utility class: not meant to be instantiated. */
     private InputValidator() {
@@ -55,7 +48,7 @@ public final class InputValidator {
      * @throws ValidationException if it is empty or too long
      */
     public static String validateAirlineName(String airlineName) throws ValidationException {
-        return requireText(airlineName, AIRLINE_NAME_FIELD, NAME_MAX_LENGTH);
+        return requireText(airlineName, "Airline name", NAME_MAX_LENGTH);
     }
 
     /**
@@ -66,7 +59,7 @@ public final class InputValidator {
      * @throws ValidationException if it is empty or too long
      */
     public static String validateCustomerName(String customerName) throws ValidationException {
-        return requireText(customerName, CUSTOMER_NAME_FIELD, NAME_MAX_LENGTH);
+        return requireText(customerName, "Customer name", NAME_MAX_LENGTH);
     }
 
     /**
@@ -77,7 +70,7 @@ public final class InputValidator {
      * @throws ValidationException if it is empty or too long
      */
     public static String validateCountry(String country) throws ValidationException {
-        return requireText(country, COUNTRY_FIELD, NAME_MAX_LENGTH);
+        return requireText(country, "Country", NAME_MAX_LENGTH);
     }
 
     /**
@@ -89,7 +82,7 @@ public final class InputValidator {
      */
     public static String validateIataCode(String iataCode) throws ValidationException {
         String normalized = trim(iataCode).toUpperCase(Locale.ROOT);
-        if (!IATA_CODE_PATTERN.matcher(normalized).matches()) {
+        if (!normalized.matches(IATA_CODE_REGEX)) {
             throw new ValidationException("The IATA code must be exactly 2 letters or digits (for example IB).");
         }
         return normalized;
@@ -107,7 +100,7 @@ public final class InputValidator {
         if (normalized.length() > EMAIL_MAX_LENGTH) {
             throw new ValidationException("The email must have at most " + EMAIL_MAX_LENGTH + " characters.");
         }
-        if (!EMAIL_PATTERN.matcher(normalized).matches()) {
+        if (!normalized.matches(EMAIL_REGEX)) {
             throw new ValidationException("The email is not valid (for example name@example.com).");
         }
         return normalized;
@@ -123,7 +116,7 @@ public final class InputValidator {
      */
     public static String validatePhoneNumber(String phoneNumber) throws ValidationException {
         String normalized = trim(phoneNumber);
-        if (!PHONE_PATTERN.matcher(normalized).matches()) {
+        if (!normalized.matches(PHONE_REGEX)) {
             throw new ValidationException("The phone number must have 9 to 20 digits or spaces, "
                     + "optionally starting with + (for example +34 600 111 222).");
         }
@@ -138,7 +131,7 @@ public final class InputValidator {
      * @throws ValidationException if it is empty or too long
      */
     public static String validateOrigin(String origin) throws ValidationException {
-        return requireText(origin, ORIGIN_FIELD, NAME_MAX_LENGTH);
+        return requireText(origin, "Origin", NAME_MAX_LENGTH);
     }
 
     /**
@@ -149,7 +142,7 @@ public final class InputValidator {
      * @throws ValidationException if it is empty or too long
      */
     public static String validateDestination(String destination) throws ValidationException {
-        return requireText(destination, DESTINATION_FIELD, NAME_MAX_LENGTH);
+        return requireText(destination, "Destination", NAME_MAX_LENGTH);
     }
 
     /**
