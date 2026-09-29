@@ -3,12 +3,8 @@ package flightreservations;
 import java.io.File;
 import java.io.IOException;
 import java.time.LocalDate;
-import java.util.List;
-import java.util.Map;
-import java.util.TreeMap;
 
 import flightreservations.dao.BookingDAO;
-import flightreservations.dao.CustomerDAO;
 import flightreservations.dao.impl.DAOFactory;
 import flightreservations.exception.DataAccessException;
 import flightreservations.model.Booking;
@@ -35,15 +31,6 @@ public final class SampleDataSeeder {
     private static final int BOOKING_DAYS_AGO = 90;
     private static final int EXIT_FAILURE = 1;
 
-    /**
-     * Booked flight IDs per customer ID. Must match the sample data and seat
-     * counts in {@code database/airlinedb_script.sql}.
-     */
-    private static final Map<Integer, List<Integer>> SAMPLE_BOOKINGS = Map.of(
-            1, List.of(1, 4, 5),
-            2, List.of(2, 3, 8),
-            3, List.of(1, 7));
-
     /** Tool class: not meant to be instantiated. */
     private SampleDataSeeder() {
     }
@@ -56,7 +43,11 @@ public final class SampleDataSeeder {
     public static void main(String[] args) {
         try {
             deleteRecursively(CUSTOMERS_FOLDER);
-            writeSampleBookings(DAOFactory.getInstance());
+            // Booked flight IDs per customer. They must match the sample data
+            // and seat counts in database/airlinedb_script.sql.
+            writeBookings(1, new int[] {1, 4, 5});
+            writeBookings(2, new int[] {2, 3, 8});
+            writeBookings(3, new int[] {1, 7});
             System.out.println("Sample booking files written to " + CUSTOMERS_FOLDER.getPath() + ".");
         } catch (DataAccessException | IOException | IllegalStateException e) {
             System.err.println("Could not write the sample booking files: " + e.getMessage());
@@ -65,28 +56,27 @@ public final class SampleDataSeeder {
     }
 
     /**
-     * Writes the sample bookings of every sample customer.
+     * Writes the sample bookings of one sample customer.
      *
-     * @param daoFactory the factory that provides the DAOs
-     * @throws DataAccessException   if a customer cannot be read or a booking
-     *                               cannot be written
-     * @throws IllegalStateException if a sample customer is not in the
-     *                               database
+     * @param customerId the ID of the customer
+     * @param flightIds  the IDs of the flights the customer booked
+     * @throws DataAccessException   if the customer cannot be read or a
+     *                               booking cannot be written
+     * @throws IllegalStateException if the customer is not in the database
      */
-    private static void writeSampleBookings(DAOFactory daoFactory) throws DataAccessException {
-        CustomerDAO customerDao = daoFactory.getCustomerDao();
-        BookingDAO bookingDao = daoFactory.getBookingDao();
-        LocalDate bookingDate = LocalDate.now().minusDays(BOOKING_DAYS_AGO);
-        for (Map.Entry<Integer, List<Integer>> entry : new TreeMap<>(SAMPLE_BOOKINGS).entrySet()) {
-            int customerId = entry.getKey();
-            Customer customer = customerDao.findById(customerId).orElseThrow(() -> new IllegalStateException(
-                    "Customer " + customerId + " not found. Run database/airlinedb_script.sql first."));
-            for (int flightId : entry.getValue()) {
-                bookingDao.insert(customer, new Booking(flightId, bookingDate));
-            }
-            System.out.println("Customer " + customerId + ": " + entry.getValue().size()
-                    + " bookings -> " + customer.getPath());
+    private static void writeBookings(int customerId, int[] flightIds) throws DataAccessException {
+        Customer customer = DAOFactory.getInstance().getCustomerDao().findById(customerId);
+        if (customer == null) {
+            throw new IllegalStateException(
+                    "Customer " + customerId + " not found. Run database/airlinedb_script.sql first.");
         }
+        BookingDAO bookingDao = DAOFactory.getInstance().getBookingDao();
+        LocalDate bookingDate = LocalDate.now().minusDays(BOOKING_DAYS_AGO);
+        for (int flightId : flightIds) {
+            bookingDao.insert(customer, new Booking(flightId, bookingDate));
+        }
+        System.out.println("Customer " + customerId + ": " + flightIds.length
+                + " bookings -> " + customer.getPath());
     }
 
     /**

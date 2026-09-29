@@ -1,7 +1,6 @@
 package flightreservations.dao;
 
 import java.util.List;
-import java.util.Optional;
 
 import flightreservations.exception.DataAccessException;
 import flightreservations.exception.DuplicateEntryException;
@@ -36,11 +35,11 @@ public interface CustomerDAO {
      * Finds a customer by its ID.
      *
      * @param customerId the ID of the customer
-     * @return the matching {@link Customer}, or an empty {@link Optional} if
-     *         it does not exist
+     * @return the matching {@link Customer}, or {@code null} if it does not
+     *         exist
      * @throws DataAccessException if the customer cannot be read
      */
-    Optional<Customer> findById(int customerId) throws DataAccessException;
+    Customer findById(int customerId) throws DataAccessException;
 
     /**
      * Finds all customers, ordered by name.

@@ -9,7 +9,6 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.Optional;
 
 import flightreservations.config.ConnectionManager;
 import flightreservations.dao.CustomerDAO;
@@ -58,7 +57,8 @@ final class CustomerDAOImpl implements CustomerDAO {
                 customer.setCustomerId(customerId);
                 customer.setPath(path);
             } catch (SQLException e) {
-                rollback(connection, e);
+                // Undo the insert so a customer is never left without a path.
+                connection.rollback();
                 throw e;
             }
         } catch (SQLIntegrityConstraintViolationException e) {
@@ -71,12 +71,15 @@ final class CustomerDAOImpl implements CustomerDAO {
 
     /** {@inheritDoc} */
     @Override
-    public Optional<Customer> findById(int customerId) throws DataAccessException {
+    public Customer findById(int customerId) throws DataAccessException {
         try (Connection connection = ConnectionManager.getInstance().getConnection();
                 PreparedStatement statement = connection.prepareStatement(SQL_FIND_BY_ID)) {
             statement.setInt(1, customerId);
             try (ResultSet resultSet = statement.executeQuery()) {
-                return resultSet.next() ? Optional.of(ResultSetMapper.toCustomer(resultSet)) : Optional.empty();
+                if (resultSet.next()) {
+                    return ResultSetMapper.toCustomer(resultSet);
+                }
+                return null;
             }
         } catch (SQLException e) {
             throw new DataAccessException("Could not read the customer " + customerId + ".", e);
@@ -131,21 +134,6 @@ final class CustomerDAOImpl implements CustomerDAO {
             statement.setString(1, path);
             statement.setInt(2, customerId);
             statement.executeUpdate();
-        }
-    }
-
-    /**
-     * Rolls back the current transaction. A rollback failure is attached to
-     * the original error instead of hiding it.
-     *
-     * @param connection the connection with the open transaction
-     * @param cause      the error that caused the rollback
-     */
-    private static void rollback(Connection connection, SQLException cause) {
-        try {
-            connection.rollback();
-        } catch (SQLException rollbackError) {
-            cause.addSuppressed(rollbackError);
         }
     }
 }

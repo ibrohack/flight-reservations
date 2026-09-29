@@ -1,10 +1,9 @@
 package flightreservations.service;
 
 import java.time.LocalDate;
-import java.util.Comparator;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
-import java.util.Objects;
-import java.util.function.Predicate;
 
 import flightreservations.dao.BookingDAO;
 import flightreservations.dao.CustomerDAO;
@@ -34,9 +33,6 @@ import flightreservations.model.Flight;
  * @author Aritz
  */
 public class BookingService {
-    private static final Comparator<Flight> BY_DEPARTURE =
-            Comparator.comparing(Flight::getDepartureDate).thenComparing(Flight::getFlightId);
-
     private final CustomerDAO customerDao;
     private final FlightDAO flightDao;
     private final BookingDAO bookingDao;
@@ -49,9 +45,9 @@ public class BookingService {
      * @param bookingDao  the booking data access object
      */
     public BookingService(CustomerDAO customerDao, FlightDAO flightDao, BookingDAO bookingDao) {
-        this.customerDao = Objects.requireNonNull(customerDao);
-        this.flightDao = Objects.requireNonNull(flightDao);
-        this.bookingDao = Objects.requireNonNull(bookingDao);
+        this.customerDao = customerDao;
+        this.flightDao = flightDao;
+        this.bookingDao = bookingDao;
     }
 
     /**
@@ -73,8 +69,10 @@ public class BookingService {
     public void bookFlight(int customerId, int flightId) throws BusinessException, DataAccessException {
         LocalDate today = LocalDate.now();
         Customer customer = findCustomer(customerId);
-        Flight flight = flightDao.findById(flightId)
-                .orElseThrow(() -> new EntityNotFoundException(Flight.class, flightId));
+        Flight flight = flightDao.findById(flightId);
+        if (flight == null) {
+            throw new EntityNotFoundException(Flight.class, flightId);
+        }
         if (!flight.getDepartureDate().isAfter(today)) {
             throw new FlightDepartedException(flightId, flight.getDepartureDate());
         }
@@ -84,7 +82,14 @@ public class BookingService {
         if (!flightDao.reserveSeat(flightId)) {
             throw new NoSeatsAvailableException(flightId);
         }
-        saveBookingOrReleaseSeat(customer, new Booking(flightId, today));
+        try {
+            bookingDao.insert(customer, new Booking(flightId, today));
+        } catch (DataAccessException e) {
+            // The file could not be written: give the seat back so the
+            // database and the file stay consistent.
+            flightDao.releaseSeat(flightId);
+            throw e;
+        }
     }
 
     /**
@@ -99,7 +104,13 @@ public class BookingService {
      */
     public List<Flight> getUpcomingFlights(int customerId) throws EntityNotFoundException, DataAccessException {
         LocalDate today = LocalDate.now();
-        return findBookedFlights(customerId, flight -> !flight.getDepartureDate().isBefore(today), BY_DEPARTURE);
+        List<Flight> upcomingFlights = new ArrayList<>();
+        for (Flight flight : findBookedFlights(customerId)) {
+            if (!flight.getDepartureDate().isBefore(today)) {
+                upcomingFlights.add(flight);
+            }
+        }
+        return upcomingFlights;
     }
 
     /**
@@ -114,8 +125,15 @@ public class BookingService {
      */
     public List<Flight> getFlightHistory(int customerId) throws EntityNotFoundException, DataAccessException {
         LocalDate today = LocalDate.now();
-        return findBookedFlights(customerId, flight -> flight.getDepartureDate().isBefore(today),
-                BY_DEPARTURE.reversed());
+        List<Flight> pastFlights = new ArrayList<>();
+        for (Flight flight : findBookedFlights(customerId)) {
+            if (flight.getDepartureDate().isBefore(today)) {
+                pastFlights.add(flight);
+            }
+        }
+        // The flights come soonest first, so reversing puts the most recent first.
+        Collections.reverse(pastFlights);
+        return pastFlights;
     }
 
     /**
@@ -127,64 +145,30 @@ public class BookingService {
      * @throws DataAccessException     if the customer cannot be read
      */
     private Customer findCustomer(int customerId) throws EntityNotFoundException, DataAccessException {
-        return customerDao.findById(customerId)
-                .orElseThrow(() -> new EntityNotFoundException(Customer.class, customerId));
+        Customer customer = customerDao.findById(customerId);
+        if (customer == null) {
+            throw new EntityNotFoundException(Customer.class, customerId);
+        }
+        return customer;
     }
 
     /**
      * Reads a customer's bookings from the customer's file and loads the
-     * booked flights from the database in a single query. Bookings of flights
-     * that no longer exist are skipped.
+     * booked flights from the database in a single query, soonest first.
+     * Bookings of flights that no longer exist are skipped.
      *
      * @param customerId the ID of the customer
-     * @param filter     which flights to keep
-     * @param order      how to sort the result
-     * @return the matching booked flights
+     * @return the booked flights, ordered by departure date
      * @throws EntityNotFoundException if the customer does not exist
      * @throws DataAccessException     if the bookings or flights cannot be
      *                                 read
      */
-    private List<Flight> findBookedFlights(int customerId, Predicate<Flight> filter, Comparator<Flight> order)
-            throws EntityNotFoundException, DataAccessException {
+    private List<Flight> findBookedFlights(int customerId) throws EntityNotFoundException, DataAccessException {
         Customer customer = findCustomer(customerId);
-        List<Integer> flightIds = bookingDao.findByCustomer(customer).stream()
-                .map(Booking::getFlightId)
-                .toList();
-        return flightDao.findByIds(flightIds).stream()
-                .filter(filter)
-                .sorted(order)
-                .toList();
-    }
-
-    /**
-     * Saves a booking in the customer's file. If that fails, the seat taken
-     * for it is given back before the error is propagated.
-     *
-     * @param customer the customer who books
-     * @param booking  the booking to save
-     * @throws DataAccessException if the booking cannot be saved
-     */
-    private void saveBookingOrReleaseSeat(Customer customer, Booking booking) throws DataAccessException {
-        try {
-            bookingDao.insert(customer, booking);
-        } catch (DataAccessException e) {
-            releaseSeat(booking.getFlightId(), e);
-            throw e;
+        List<Integer> flightIds = new ArrayList<>();
+        for (Booking booking : bookingDao.findByCustomer(customer)) {
+            flightIds.add(booking.getFlightId());
         }
-    }
-
-    /**
-     * Gives back a reserved seat. If that also fails, the failure is attached
-     * to the original error so neither is lost.
-     *
-     * @param flightId the ID of the flight
-     * @param cause    the error that made the booking fail
-     */
-    private void releaseSeat(int flightId, DataAccessException cause) {
-        try {
-            flightDao.releaseSeat(flightId);
-        } catch (DataAccessException releaseError) {
-            cause.addSuppressed(releaseError);
-        }
+        return flightDao.findByIds(flightIds);
     }
 }

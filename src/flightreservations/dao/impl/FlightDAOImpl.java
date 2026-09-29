@@ -7,10 +7,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
 
 import flightreservations.config.ConnectionManager;
 import flightreservations.dao.FlightDAO;
@@ -38,13 +35,10 @@ final class FlightDAOImpl implements FlightDAO {
     private static final String SQL_FIND_BY_ID = SQL_SELECT + " WHERE f.flightId = ?";
     private static final String SQL_FIND_DEPARTING_AFTER =
             SQL_SELECT + " WHERE f.departureDate > ?" + ORDER_BY_DEPARTURE;
-    private static final String SQL_FIND_BY_IDS = SQL_SELECT + " WHERE f.flightId IN (%s)" + ORDER_BY_DEPARTURE;
     private static final String SQL_RESERVE_SEAT =
             "UPDATE flight SET seatAmount = seatAmount - 1 WHERE flightId = ? AND seatAmount > 0";
     private static final String SQL_RELEASE_SEAT =
             "UPDATE flight SET seatAmount = seatAmount + 1 WHERE flightId = ?";
-    private static final String PLACEHOLDER = "?";
-    private static final String PLACEHOLDER_SEPARATOR = ", ";
 
     /** Only {@link DAOFactory} creates the instance. */
     FlightDAOImpl() {
@@ -72,12 +66,15 @@ final class FlightDAOImpl implements FlightDAO {
 
     /** {@inheritDoc} */
     @Override
-    public Optional<Flight> findById(int flightId) throws DataAccessException {
+    public Flight findById(int flightId) throws DataAccessException {
         try (Connection connection = ConnectionManager.getInstance().getConnection();
                 PreparedStatement statement = connection.prepareStatement(SQL_FIND_BY_ID)) {
             statement.setInt(1, flightId);
             try (ResultSet resultSet = statement.executeQuery()) {
-                return resultSet.next() ? Optional.of(ResultSetMapper.toFlight(resultSet)) : Optional.empty();
+                if (resultSet.next()) {
+                    return ResultSetMapper.toFlight(resultSet);
+                }
+                return null;
             }
         } catch (SQLException e) {
             throw new DataAccessException("Could not read the flight " + flightId + ".", e);
@@ -98,18 +95,23 @@ final class FlightDAOImpl implements FlightDAO {
 
     /** {@inheritDoc} */
     @Override
-    public List<Flight> findByIds(Collection<Integer> flightIds) throws DataAccessException {
+    public List<Flight> findByIds(List<Integer> flightIds) throws DataAccessException {
         if (flightIds.isEmpty()) {
             return new ArrayList<>();
         }
         // Only "?" placeholders are added to the SQL; every ID is still bound as a parameter.
-        String placeholders = String.join(PLACEHOLDER_SEPARATOR, Collections.nCopies(flightIds.size(), PLACEHOLDER));
-        String sql = String.format(SQL_FIND_BY_IDS, placeholders);
+        String placeholders = "";
+        for (int i = 0; i < flightIds.size(); i++) {
+            if (i > 0) {
+                placeholders += ", ";
+            }
+            placeholders += "?";
+        }
+        String sql = SQL_SELECT + " WHERE f.flightId IN (" + placeholders + ")" + ORDER_BY_DEPARTURE;
         try (Connection connection = ConnectionManager.getInstance().getConnection();
                 PreparedStatement statement = connection.prepareStatement(sql)) {
-            int parameterIndex = 1;
-            for (int flightId : flightIds) {
-                statement.setInt(parameterIndex++, flightId);
+            for (int i = 0; i < flightIds.size(); i++) {
+                statement.setInt(i + 1, flightIds.get(i));
             }
             return readFlights(statement);
         } catch (SQLException e) {

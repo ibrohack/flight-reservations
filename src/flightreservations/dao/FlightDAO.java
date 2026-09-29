@@ -1,9 +1,7 @@
 package flightreservations.dao;
 
 import java.time.LocalDate;
-import java.util.Collection;
 import java.util.List;
-import java.util.Optional;
 
 import flightreservations.exception.DataAccessException;
 import flightreservations.model.Flight;
@@ -34,11 +32,11 @@ public interface FlightDAO {
      * Finds a flight by its ID.
      *
      * @param flightId the ID of the flight
-     * @return the matching {@link Flight}, or an empty {@link Optional} if it
-     *         does not exist
+     * @return the matching {@link Flight}, or {@code null} if it does not
+     *         exist
      * @throws DataAccessException if the flight cannot be read
      */
-    Optional<Flight> findById(int flightId) throws DataAccessException;
+    Flight findById(int flightId) throws DataAccessException;
 
     /**
      * Finds the flights that depart after a date, ordered by departure date.
@@ -59,7 +57,7 @@ public interface FlightDAO {
      *         is empty
      * @throws DataAccessException if the flights cannot be read
      */
-    List<Flight> findByIds(Collection<Integer> flightIds) throws DataAccessException;
+    List<Flight> findByIds(List<Integer> flightIds) throws DataAccessException;
 
     /**
      * Takes one available seat of a flight, only if there is one left. The
