@@ -2,7 +2,6 @@ package flightreservations.service;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Objects;
 
 import flightreservations.dao.AirlineDAO;
 import flightreservations.dao.FlightDAO;
@@ -32,8 +31,8 @@ public class FlightService {
      * @param airlineDao the airline data access object
      */
     public FlightService(FlightDAO flightDao, AirlineDAO airlineDao) {
-        this.flightDao = Objects.requireNonNull(flightDao);
-        this.airlineDao = Objects.requireNonNull(airlineDao);
+        this.flightDao = flightDao;
+        this.airlineDao = airlineDao;
     }
 
     /**
@@ -49,8 +48,10 @@ public class FlightService {
      */
     public void registerFlight(Flight flight, int airlineId) throws BusinessException, DataAccessException {
         validate(flight);
-        Airline airline = airlineDao.findById(airlineId)
-                .orElseThrow(() -> new EntityNotFoundException(Airline.class, airlineId));
+        Airline airline = airlineDao.findById(airlineId);
+        if (airline == null) {
+            throw new EntityNotFoundException(Airline.class, airlineId);
+        }
         flight.setAirline(airline);
         flightDao.insert(flight);
     }

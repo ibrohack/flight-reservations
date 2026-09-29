@@ -8,7 +8,6 @@ import java.sql.SQLIntegrityConstraintViolationException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 import flightreservations.config.ConnectionManager;
 import flightreservations.dao.AirlineDAO;
@@ -56,12 +55,15 @@ final class AirlineDAOImpl implements AirlineDAO {
 
     /** {@inheritDoc} */
     @Override
-    public Optional<Airline> findById(int airlineId) throws DataAccessException {
+    public Airline findById(int airlineId) throws DataAccessException {
         try (Connection connection = ConnectionManager.getInstance().getConnection();
                 PreparedStatement statement = connection.prepareStatement(SQL_FIND_BY_ID)) {
             statement.setInt(1, airlineId);
             try (ResultSet resultSet = statement.executeQuery()) {
-                return resultSet.next() ? Optional.of(ResultSetMapper.toAirline(resultSet)) : Optional.empty();
+                if (resultSet.next()) {
+                    return ResultSetMapper.toAirline(resultSet);
+                }
+                return null;
             }
         } catch (SQLException e) {
             throw new DataAccessException("Could not read the airline " + airlineId + ".", e);

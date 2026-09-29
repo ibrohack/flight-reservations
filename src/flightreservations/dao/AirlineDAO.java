@@ -1,7 +1,6 @@
 package flightreservations.dao;
 
 import java.util.List;
-import java.util.Optional;
 
 import flightreservations.exception.DataAccessException;
 import flightreservations.exception.DuplicateEntryException;
@@ -34,11 +33,11 @@ public interface AirlineDAO {
      * Finds an airline by its ID.
      *
      * @param airlineId the ID of the airline
-     * @return the matching {@link Airline}, or an empty {@link Optional} if
-     *         it does not exist
+     * @return the matching {@link Airline}, or {@code null} if it does not
+     *         exist
      * @throws DataAccessException if the airline cannot be read
      */
-    Optional<Airline> findById(int airlineId) throws DataAccessException;
+    Airline findById(int airlineId) throws DataAccessException;
 
     /**
      * Finds all airlines, ordered by name.
