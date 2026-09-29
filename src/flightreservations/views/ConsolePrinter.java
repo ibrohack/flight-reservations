@@ -2,8 +2,6 @@ package flightreservations.views;
 
 import java.io.PrintStream;
 import java.util.List;
-import java.util.Objects;
-import java.util.function.Function;
 
 import flightreservations.model.Airline;
 import flightreservations.model.Customer;
@@ -25,15 +23,9 @@ public class ConsolePrinter {
             "▀   ▀─▀ ─▀─ ▀─▀ ▀ ▀   ▀        ▀ ▀ ▀─▀ ▀─▀ ▀─▀ ▀ ▀  ▀  ▀ ▀   ▀   ─▀─ ▀─▀ ▀ ▀ ▀─▀\n";
     private static final String SEPARATOR =
             "────────────────────────────────────────────────────────────────────────────────";
-    private static final String MENU_ROW = "%d. %s%n";
-    private static final String CHOICE_ROW = "  %d) %s%n";
     private static final String AIRLINE_ROW = "%-4s %-25s %-20s %s%n";
     private static final String CUSTOMER_ROW = "%-4s %-22s %-32s %-18s %s%n";
     private static final String FLIGHT_ROW = "%-4s %-12s %-12s %-10s %-8s %5s  %s%n";
-    private static final String SUCCESS_PREFIX = "[OK] ";
-    private static final String WARNING_PREFIX = "[!] ";
-    private static final String ERROR_PREFIX = "[ERROR] ";
-    private static final String PROMPT_SUFFIX = ": ";
 
     private final PrintStream out;
 
@@ -43,7 +35,7 @@ public class ConsolePrinter {
      * @param out the stream to write to, usually {@code System.out}
      */
     public ConsolePrinter(PrintStream out) {
-        this.out = Objects.requireNonNull(out);
+        this.out = out;
     }
 
     /** Prints the application banner. */
@@ -51,20 +43,19 @@ public class ConsolePrinter {
         out.println(BANNER);
     }
 
-    /**
-     * Prints the main menu, with a separator line between sections.
-     *
-     * @param options the options to show, in order
-     */
-    public void printMenu(MenuOption[] options) {
-        MenuOption.Section currentSection = null;
-        for (MenuOption option : options) {
-            if (option.getSection() != currentSection) {
-                out.println(SEPARATOR);
-                currentSection = option.getSection();
-            }
-            out.printf(MENU_ROW, option.getNumber(), option.getLabel());
-        }
+    /** Prints the main menu, with a separator line between sections. */
+    public void printMenu() {
+        out.println(SEPARATOR);
+        out.println("1. Register a customer");
+        out.println("2. Check a customer's flights");
+        out.println("3. View a customer's flight history");
+        out.println(SEPARATOR);
+        out.println("4. Register an airline");
+        out.println("5. Register a flight");
+        out.println("6. Check future flights");
+        out.println("7. Book a flight");
+        out.println(SEPARATOR);
+        out.println("0. Exit");
         out.println(SEPARATOR);
     }
 
@@ -75,7 +66,7 @@ public class ConsolePrinter {
      */
     public void printChoices(Object[] choices) {
         for (int index = 0; index < choices.length; index++) {
-            out.printf(CHOICE_ROW, index + 1, choices[index]);
+            out.println("  " + (index + 1) + ") " + choices[index]);
         }
     }
 
@@ -95,46 +86,61 @@ public class ConsolePrinter {
      * @param prompt the text asking for a value
      */
     public void printPrompt(String prompt) {
-        out.print(prompt + PROMPT_SUFFIX);
+        out.print(prompt + ": ");
     }
 
     /**
-     * Prints a table of airlines.
+     * Prints a table of airlines, or a message if there are none.
      *
      * @param airlines the airlines to show
      */
     public void printAirlines(List<Airline> airlines) {
-        printTable(AIRLINE_ROW, new Object[] {"ID", "Name", "Country", "IATA"}, airlines,
-                airline -> new Object[] {airline.getAirlineId(), airline.getAirlineName(),
-                        airline.getCountry(), airline.getIataCode()},
-                "There are no airlines yet.");
+        if (airlines.isEmpty()) {
+            out.println("There are no airlines yet.");
+            return;
+        }
+        out.printf(AIRLINE_ROW, "ID", "Name", "Country", "IATA");
+        for (Airline airline : airlines) {
+            out.printf(AIRLINE_ROW, airline.getAirlineId(), airline.getAirlineName(),
+                    airline.getCountry(), airline.getIataCode());
+        }
     }
 
     /**
-     * Prints a table of customers.
+     * Prints a table of customers, or a message if there are none.
      *
      * @param customers the customers to show
      */
     public void printCustomers(List<Customer> customers) {
-        printTable(CUSTOMER_ROW, new Object[] {"ID", "Name", "Email", "Phone", "Bookings file"}, customers,
-                customer -> new Object[] {customer.getCustomerId(), customer.getCustomerName(),
-                        customer.getEmail(), customer.getPhoneNumber(), customer.getPath()},
-                "There are no customers yet.");
+        if (customers.isEmpty()) {
+            out.println("There are no customers yet.");
+            return;
+        }
+        out.printf(CUSTOMER_ROW, "ID", "Name", "Email", "Phone", "Bookings file");
+        for (Customer customer : customers) {
+            out.printf(CUSTOMER_ROW, customer.getCustomerId(), customer.getCustomerName(),
+                    customer.getEmail(), customer.getPhoneNumber(), customer.getPath());
+        }
     }
 
     /**
-     * Prints a table of flights.
+     * Prints a table of flights, or a message if there are none.
      *
      * @param flights      the flights to show
      * @param emptyMessage the message shown when there are no flights
      */
     public void printFlights(List<Flight> flights, String emptyMessage) {
-        printTable(FLIGHT_ROW, new Object[] {"ID", "Origin", "Destination", "Date", "Class", "Seats", "Airline"},
-                flights,
-                flight -> new Object[] {flight.getFlightId(), flight.getOrigin(), flight.getDestination(),
-                        flight.getDepartureDate(), flight.getTravelClass(), flight.getSeatAmount(),
-                        flight.getAirline().getAirlineName() + " (" + flight.getAirline().getIataCode() + ")"},
-                emptyMessage);
+        if (flights.isEmpty()) {
+            out.println(emptyMessage);
+            return;
+        }
+        out.printf(FLIGHT_ROW, "ID", "Origin", "Destination", "Date", "Class", "Seats", "Airline");
+        for (Flight flight : flights) {
+            Airline airline = flight.getAirline();
+            out.printf(FLIGHT_ROW, flight.getFlightId(), flight.getOrigin(), flight.getDestination(),
+                    flight.getDepartureDate(), flight.getTravelClass(), flight.getSeatAmount(),
+                    airline.getAirlineName() + " (" + airline.getIataCode() + ")");
+        }
     }
 
     /**
@@ -143,7 +149,7 @@ public class ConsolePrinter {
      * @param message the message
      */
     public void printSuccess(String message) {
-        out.println(SUCCESS_PREFIX + message);
+        out.println("[OK] " + message);
     }
 
     /**
@@ -152,7 +158,7 @@ public class ConsolePrinter {
      * @param message the message
      */
     public void printWarning(String message) {
-        out.println(WARNING_PREFIX + message);
+        out.println("[!] " + message);
     }
 
     /**
@@ -161,7 +167,7 @@ public class ConsolePrinter {
      * @param message the message
      */
     public void printError(String message) {
-        out.println(ERROR_PREFIX + message);
+        out.println("[ERROR] " + message);
     }
 
     /**
@@ -171,28 +177,5 @@ public class ConsolePrinter {
      */
     public void printMessage(String message) {
         out.println(message);
-    }
-
-    /**
-     * Prints rows as an aligned table with a header, or a message if there
-     * are no rows.
-     *
-     * @param <T>          the type of the rows
-     * @param rowFormat    the {@link String#format} pattern of one row
-     * @param headers      the column headers
-     * @param rows         the rows to show
-     * @param columns      extracts the column values of a row
-     * @param emptyMessage the message shown when there are no rows
-     */
-    private <T> void printTable(String rowFormat, Object[] headers, List<T> rows,
-            Function<T, Object[]> columns, String emptyMessage) {
-        if (rows.isEmpty()) {
-            out.println(emptyMessage);
-            return;
-        }
-        out.printf(rowFormat, headers);
-        for (T row : rows) {
-            out.printf(rowFormat, columns.apply(row));
-        }
     }
 }

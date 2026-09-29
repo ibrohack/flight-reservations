@@ -2,13 +2,11 @@ package flightreservations.views;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.OptionalInt;
 
 import flightreservations.exception.BusinessException;
 import flightreservations.exception.DataAccessException;
 import flightreservations.exception.InputClosedException;
+import flightreservations.exception.ValidationException;
 import flightreservations.model.Airline;
 import flightreservations.model.Customer;
 import flightreservations.model.Flight;
@@ -23,8 +21,9 @@ import flightreservations.util.InputValidator;
  * Console user interface: shows the main menu and runs the chosen use case.
  * <p>
  * This is where the exceptions of the lower layers end up. Every use case
- * runs inside {@link #runSafely(MenuAction)}, which shows business errors as
- * warnings, data errors as errors, and keeps the menu running in all cases.
+ * runs inside the try/catch of {@link #run()}, which shows business errors
+ * as warnings, data errors as errors, and keeps the menu running in all
+ * cases.
  * </p>
  *
  * @author Brayan
@@ -32,21 +31,11 @@ import flightreservations.util.InputValidator;
  * @author Aritz
  */
 public class ConsoleMenu {
+    private static final int EXIT = 0;
+    private static final int LAST_OPTION = 7;
+    /** Returned by {@link #chooseCustomer()} when there is no customer to choose. */
+    private static final int NO_CUSTOMER = 0;
     private static final String NO_FUTURE_FLIGHTS = "There are no future flights.";
-    private static final String NO_UPCOMING_FLIGHTS = "This customer has no upcoming flights.";
-    private static final String NO_PAST_FLIGHTS = "This customer has no past flights.";
-
-    /** A use case run from the menu. */
-    @FunctionalInterface
-    private interface MenuAction {
-        /**
-         * Runs the use case.
-         *
-         * @throws BusinessException   if the user breaks a business rule
-         * @throws DataAccessException if the data cannot be read or saved
-         */
-        void run() throws BusinessException, DataAccessException;
-    }
 
     private final ConsoleInput input;
     private final ConsolePrinter printer;
@@ -67,83 +56,48 @@ public class ConsoleMenu {
      */
     public ConsoleMenu(ConsoleInput input, ConsolePrinter printer, AirlineService airlineService,
             CustomerService customerService, FlightService flightService, BookingService bookingService) {
-        this.input = Objects.requireNonNull(input);
-        this.printer = Objects.requireNonNull(printer);
-        this.airlineService = Objects.requireNonNull(airlineService);
-        this.customerService = Objects.requireNonNull(customerService);
-        this.flightService = Objects.requireNonNull(flightService);
-        this.bookingService = Objects.requireNonNull(bookingService);
+        this.input = input;
+        this.printer = printer;
+        this.airlineService = airlineService;
+        this.customerService = customerService;
+        this.flightService = flightService;
+        this.bookingService = bookingService;
     }
 
     /**
      * Shows the menu and runs the chosen use cases until the user exits or
-     * the standard input is closed.
+     * the standard input is closed. Any error is shown to the user without
+     * stopping the application.
      */
     public void run() {
         printer.printBanner();
-        try {
-            MenuOption option = readOption();
-            while (option != MenuOption.EXIT) {
-                runSafely(actionFor(option));
-                option = readOption();
+        int option = -1;
+        while (option != EXIT) {
+            try {
+                printer.printMenu();
+                option = input.readInt("Choose an option", EXIT, LAST_OPTION);
+                switch (option) {
+                    case 1 -> registerCustomer();
+                    case 2 -> showCustomerFlights();
+                    case 3 -> showFlightHistory();
+                    case 4 -> registerAirline();
+                    case 5 -> registerFlight();
+                    case 6 -> showFutureFlights();
+                    case 7 -> bookFlight();
+                    case EXIT -> printer.printMessage("Goodbye!");
+                }
+            } catch (BusinessException e) {
+                printer.printWarning(e.getMessage());
+            } catch (DataAccessException e) {
+                printer.printError(describe(e));
+            } catch (InputClosedException e) {
+                // Caught before RuntimeException because it is a subclass of it:
+                // closing the input ends the program, it is not an error.
+                printer.printMessage("\nInput closed. Goodbye!");
+                option = EXIT;
+            } catch (RuntimeException e) {
+                printer.printError("Unexpected error: " + e);
             }
-            printer.printMessage("Goodbye!");
-        } catch (InputClosedException e) {
-            printer.printMessage("\nInput closed. Goodbye!");
-        }
-    }
-
-    /**
-     * Shows the menu and reads a valid option.
-     *
-     * @return the chosen option
-     */
-    private MenuOption readOption() {
-        printer.printMenu(MenuOption.values());
-        Optional<MenuOption> option = MenuOption.fromNumber(input.readInt("Choose an option"));
-        while (option.isEmpty()) {
-            printer.printWarning("That option is not in the menu.");
-            option = MenuOption.fromNumber(input.readInt("Choose an option"));
-        }
-        return option.get();
-    }
-
-    /**
-     * Gets the use case of a menu option.
-     *
-     * @param option a menu option other than {@link MenuOption#EXIT}
-     * @return the use case to run
-     */
-    private MenuAction actionFor(MenuOption option) {
-        return switch (option) {
-            case REGISTER_CUSTOMER -> this::registerCustomer;
-            case CUSTOMER_FLIGHTS -> this::showCustomerFlights;
-            case FLIGHT_HISTORY -> this::showFlightHistory;
-            case REGISTER_AIRLINE -> this::registerAirline;
-            case REGISTER_FLIGHT -> this::registerFlight;
-            case FUTURE_FLIGHTS -> this::showFutureFlights;
-            case BOOK_FLIGHT -> this::bookFlight;
-            case EXIT -> throw new IllegalArgumentException("Exit has no action.");
-        };
-    }
-
-    /**
-     * Runs a use case and shows any error to the user without stopping the
-     * application.
-     *
-     * @param action the use case
-     */
-    private void runSafely(MenuAction action) {
-        try {
-            action.run();
-        } catch (BusinessException e) {
-            printer.printWarning(e.getMessage());
-        } catch (DataAccessException e) {
-            printer.printError(describe(e));
-        } catch (InputClosedException e) {
-            throw e; // closing the input must end the program, not be reported as an error
-        } catch (RuntimeException e) {
-            printer.printError("Unexpected error: " + e);
         }
     }
 
@@ -154,7 +108,7 @@ public class ConsoleMenu {
      * @throws DataAccessException if the customer cannot be saved
      */
     private void registerCustomer() throws BusinessException, DataAccessException {
-        printer.printTitle(MenuOption.REGISTER_CUSTOMER.getLabel());
+        printer.printTitle("Register a customer");
         String name = input.readText("Name", InputValidator::validateCustomerName);
         String email = input.readText("Email", InputValidator::validateEmail);
         String phoneNumber = input.readText("Phone number", InputValidator::validatePhoneNumber);
@@ -171,10 +125,11 @@ public class ConsoleMenu {
      * @throws DataAccessException if the data cannot be read
      */
     private void showCustomerFlights() throws BusinessException, DataAccessException {
-        printer.printTitle(MenuOption.CUSTOMER_FLIGHTS.getLabel());
-        OptionalInt customerId = chooseCustomer();
-        if (customerId.isPresent()) {
-            printer.printFlights(bookingService.getUpcomingFlights(customerId.getAsInt()), NO_UPCOMING_FLIGHTS);
+        printer.printTitle("Check a customer's flights");
+        int customerId = chooseCustomer();
+        if (customerId != NO_CUSTOMER) {
+            List<Flight> flights = bookingService.getUpcomingFlights(customerId);
+            printer.printFlights(flights, "This customer has no upcoming flights.");
         }
     }
 
@@ -185,10 +140,11 @@ public class ConsoleMenu {
      * @throws DataAccessException if the data cannot be read
      */
     private void showFlightHistory() throws BusinessException, DataAccessException {
-        printer.printTitle(MenuOption.FLIGHT_HISTORY.getLabel());
-        OptionalInt customerId = chooseCustomer();
-        if (customerId.isPresent()) {
-            printer.printFlights(bookingService.getFlightHistory(customerId.getAsInt()), NO_PAST_FLIGHTS);
+        printer.printTitle("View a customer's flight history");
+        int customerId = chooseCustomer();
+        if (customerId != NO_CUSTOMER) {
+            List<Flight> flights = bookingService.getFlightHistory(customerId);
+            printer.printFlights(flights, "This customer has no past flights.");
         }
     }
 
@@ -199,7 +155,7 @@ public class ConsoleMenu {
      * @throws DataAccessException if the airline cannot be saved
      */
     private void registerAirline() throws BusinessException, DataAccessException {
-        printer.printTitle(MenuOption.REGISTER_AIRLINE.getLabel());
+        printer.printTitle("Register an airline");
         String name = input.readText("Name", InputValidator::validateAirlineName);
         String country = input.readText("Country", InputValidator::validateCountry);
         String iataCode = input.readText("IATA code (2 characters)", InputValidator::validateIataCode);
@@ -216,7 +172,7 @@ public class ConsoleMenu {
      * @throws DataAccessException if the flight cannot be saved
      */
     private void registerFlight() throws BusinessException, DataAccessException {
-        printer.printTitle(MenuOption.REGISTER_FLIGHT.getLabel());
+        printer.printTitle("Register a flight");
         List<Airline> airlines = airlineService.getAllAirlines();
         printer.printAirlines(airlines);
         if (airlines.isEmpty()) {
@@ -224,15 +180,13 @@ public class ConsoleMenu {
         }
         int airlineId = input.readId("Airline ID");
         String origin = input.readText("Origin", InputValidator::validateOrigin);
-        String destination = input.readText("Destination", text -> {
-            String validDestination = InputValidator.validateDestination(text);
-            InputValidator.validateRoute(origin, validDestination);
-            return validDestination;
-        });
-        LocalDate departureDate = input.readDate("Departure date (yyyy-MM-dd)",
-                date -> InputValidator.validateDepartureDate(date, LocalDate.now()));
+        String destination = readDestination(origin);
+        LocalDate departureDate = readDepartureDate();
         int seatAmount = input.readInt("Seats", InputValidator.MIN_SEATS, InputValidator.MAX_SEATS);
-        TravelClass travelClass = input.readChoice("Travel class", TravelClass.values());
+        TravelClass[] travelClasses = TravelClass.values();
+        printer.printChoices(travelClasses);
+        int choice = input.readInt("Travel class", 1, travelClasses.length);
+        TravelClass travelClass = travelClasses[choice - 1];
         Flight flight = new Flight(origin, destination, departureDate, seatAmount, travelClass);
         flightService.registerFlight(flight, airlineId);
         printer.printSuccess("Flight registered with ID " + flight.getFlightId() + ".");
@@ -244,7 +198,7 @@ public class ConsoleMenu {
      * @throws DataAccessException if the flights cannot be read
      */
     private void showFutureFlights() throws DataAccessException {
-        printer.printTitle(MenuOption.FUTURE_FLIGHTS.getLabel());
+        printer.printTitle("Check future flights");
         printer.printFlights(flightService.getFutureFlights(), NO_FUTURE_FLIGHTS);
     }
 
@@ -255,9 +209,9 @@ public class ConsoleMenu {
      * @throws DataAccessException if the booking cannot be saved
      */
     private void bookFlight() throws BusinessException, DataAccessException {
-        printer.printTitle(MenuOption.BOOK_FLIGHT.getLabel());
-        OptionalInt customerId = chooseCustomer();
-        if (customerId.isEmpty()) {
+        printer.printTitle("Book a flight");
+        int customerId = chooseCustomer();
+        if (customerId == NO_CUSTOMER) {
             return;
         }
         List<Flight> flights = flightService.getFutureFlights();
@@ -266,37 +220,73 @@ public class ConsoleMenu {
             return;
         }
         int flightId = input.readId("Flight ID");
-        bookingService.bookFlight(customerId.getAsInt(), flightId);
-        printer.printSuccess("Flight " + flightId + " booked for customer " + customerId.getAsInt() + ".");
+        bookingService.bookFlight(customerId, flightId);
+        printer.printSuccess("Flight " + flightId + " booked for customer " + customerId + ".");
     }
 
     /**
      * Lists the customers and reads the ID of one of them.
      *
-     * @return the typed customer ID, or empty if there are no customers
+     * @return the typed customer ID, or {@link #NO_CUSTOMER} if there are no
+     *         customers
      * @throws DataAccessException if the customers cannot be read
      */
-    private OptionalInt chooseCustomer() throws DataAccessException {
+    private int chooseCustomer() throws DataAccessException {
         List<Customer> customers = customerService.getAllCustomers();
         printer.printCustomers(customers);
-        return customers.isEmpty() ? OptionalInt.empty() : OptionalInt.of(input.readId("Customer ID"));
+        if (customers.isEmpty()) {
+            return NO_CUSTOMER;
+        }
+        return input.readId("Customer ID");
     }
 
     /**
-     * Builds a readable description of a data error, including its cause and
-     * any error that happened while recovering from it.
+     * Reads the destination of a flight until it is valid and different
+     * from the origin.
+     *
+     * @param origin the validated origin city
+     * @return the validated destination city
+     */
+    private String readDestination(String origin) {
+        while (true) {
+            String destination = input.readText("Destination", InputValidator::validateDestination);
+            try {
+                InputValidator.validateRoute(origin, destination);
+                return destination;
+            } catch (ValidationException e) {
+                printer.printWarning(e.getMessage());
+            }
+        }
+    }
+
+    /**
+     * Reads the departure date of a flight until it is after today and not
+     * too far ahead.
+     *
+     * @return the validated departure date
+     */
+    private LocalDate readDepartureDate() {
+        while (true) {
+            LocalDate date = input.readDate("Departure date (yyyy-MM-dd)");
+            try {
+                return InputValidator.validateDepartureDate(date, LocalDate.now());
+            } catch (ValidationException e) {
+                printer.printWarning(e.getMessage());
+            }
+        }
+    }
+
+    /**
+     * Builds a readable description of a data error, including its cause.
      *
      * @param e the data error
      * @return the description to show
      */
     private static String describe(DataAccessException e) {
-        StringBuilder description = new StringBuilder(e.getMessage());
+        String description = e.getMessage();
         if (e.getCause() != null && e.getCause().getMessage() != null) {
-            description.append(" Cause: ").append(e.getCause().getMessage());
+            description += " Cause: " + e.getCause().getMessage();
         }
-        for (Throwable suppressed : e.getSuppressed()) {
-            description.append(" Also: ").append(suppressed.getMessage());
-        }
-        return description.toString();
+        return description;
     }
 }

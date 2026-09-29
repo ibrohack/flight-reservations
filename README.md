@@ -19,7 +19,7 @@ Each customer's bookings file is opened from the path stored in the database (`c
 views (console)  ──►  service (business rules)  ──►  dao (interfaces)  ──►  dao.impl  ──►  MySQL / flights.dat
 ```
 
-- **views**: `ConsoleMenu`, `ConsoleInput`, `ConsolePrinter` and `MenuOption`. This layer reads input, shows results, and is where every error ends up being shown.
+- **views**: `ConsoleMenu`, `ConsoleInput` and `ConsolePrinter`. This layer reads input, shows results, and is where every error ends up being shown.
 - **service**: `AirlineService`, `CustomerService`, `FlightService` and `BookingService`. They validate input and apply the booking rules. They only use the DAO interfaces.
 - **dao**: the `AirlineDAO`, `CustomerDAO`, `FlightDAO` and `BookingDAO` interfaces.
 - **dao.impl**: one implementation per interface, plus `DAOFactory`. `DAOFactory` is a Singleton and the only class that creates the DAOs.

@@ -3,7 +3,6 @@ package flightreservations.views;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.NoSuchElementException;
-import java.util.Objects;
 import java.util.Scanner;
 
 import flightreservations.exception.InputClosedException;
@@ -23,44 +22,20 @@ import flightreservations.exception.ValidationException;
  * @author Aritz
  */
 public class ConsoleInput {
-    private static final int FIRST_CHOICE = 1;
-    private static final int MIN_ID = 1;
-    private static final String DATE_FORMAT_MESSAGE = "Enter a valid date as yyyy-MM-dd (for example 2027-03-15).";
-    private static final String ID_MESSAGE = "Enter a positive whole number (an ID from the list).";
-    private static final String NUMBER_MESSAGE = "Enter a whole number.";
 
     /**
-     * A validation rule for a value typed by the user.
-     *
-     * @param <T> the type of the value
+     * A validation rule for a text typed by the user, for example
+     * {@code InputValidator::validateEmail}.
      */
-    @FunctionalInterface
-    public interface Validator<T> {
+    public interface Validator {
         /**
-         * Checks a value.
+         * Checks a text.
          *
-         * @param value the value to check
-         * @return the value, possibly normalized
-         * @throws ValidationException if the value is not valid
-         */
-        T validate(T value) throws ValidationException;
-    }
-
-    /**
-     * Converts the typed text into a value.
-     *
-     * @param <T> the type of the value
-     */
-    @FunctionalInterface
-    private interface Parser<T> {
-        /**
-         * Converts a text.
-         *
-         * @param text the typed text
-         * @return the converted value
+         * @param text the text to check
+         * @return the text, possibly normalized
          * @throws ValidationException if the text is not valid
          */
-        T parse(String text) throws ValidationException;
+        String validate(String text) throws ValidationException;
     }
 
     private final Scanner scanner;
@@ -73,8 +48,8 @@ public class ConsoleInput {
      * @param printer the printer used for prompts and error messages
      */
     public ConsoleInput(Scanner scanner, ConsolePrinter printer) {
-        this.scanner = Objects.requireNonNull(scanner);
-        this.printer = Objects.requireNonNull(printer);
+        this.scanner = scanner;
+        this.printer = printer;
     }
 
     /**
@@ -85,19 +60,15 @@ public class ConsoleInput {
      * @return the validated (and normalized) text
      * @throws InputClosedException if the standard input is closed
      */
-    public String readText(String prompt, Validator<String> validator) {
-        return readUntilValid(prompt, validator::validate);
-    }
-
-    /**
-     * Reads any whole number.
-     *
-     * @param prompt the text asking for the value
-     * @return the number
-     * @throws InputClosedException if the standard input is closed
-     */
-    public int readInt(String prompt) {
-        return readUntilValid(prompt, text -> parseInt(text, Integer.MIN_VALUE, Integer.MAX_VALUE, NUMBER_MESSAGE));
+    public String readText(String prompt, Validator validator) {
+        while (true) {
+            String text = readLine(prompt);
+            try {
+                return validator.validate(text);
+            } catch (ValidationException e) {
+                printer.printWarning(e.getMessage());
+            }
+        }
     }
 
     /**
@@ -110,8 +81,7 @@ public class ConsoleInput {
      * @throws InputClosedException if the standard input is closed
      */
     public int readInt(String prompt, int min, int max) {
-        String message = "Enter a whole number from " + min + " to " + max + ".";
-        return readUntilValid(prompt, text -> parseInt(text, min, max, message));
+        return readNumber(prompt, min, max, "Enter a whole number from " + min + " to " + max + ".");
     }
 
     /**
@@ -122,52 +92,49 @@ public class ConsoleInput {
      * @throws InputClosedException if the standard input is closed
      */
     public int readId(String prompt) {
-        return readUntilValid(prompt, text -> parseInt(text, MIN_ID, Integer.MAX_VALUE, ID_MESSAGE));
+        return readNumber(prompt, 1, Integer.MAX_VALUE, "Enter a positive whole number (an ID from the list).");
     }
 
     /**
-     * Reads a date in ISO format ({@code yyyy-MM-dd}) that must pass a
-     * validation rule.
+     * Reads a date in ISO format ({@code yyyy-MM-dd}).
      *
-     * @param prompt    the text asking for the value
-     * @param validator the rule the date must pass
-     * @return the validated date
-     * @throws InputClosedException if the standard input is closed
-     */
-    public LocalDate readDate(String prompt, Validator<LocalDate> validator) {
-        return readUntilValid(prompt, text -> validator.validate(parseDate(text)));
-    }
-
-    /**
-     * Shows a numbered list of choices and reads the chosen one.
-     *
-     * @param <E>     the enum type of the choices
-     * @param prompt  the text asking for the choice
-     * @param choices the available choices
-     * @return the chosen value
-     * @throws InputClosedException if the standard input is closed
-     */
-    public <E extends Enum<E>> E readChoice(String prompt, E[] choices) {
-        printer.printChoices(choices);
-        return choices[readInt(prompt, FIRST_CHOICE, choices.length) - FIRST_CHOICE];
-    }
-
-    /**
-     * Prompts until the typed text can be converted into a valid value.
-     *
-     * @param <T>    the type of the value
      * @param prompt the text asking for the value
-     * @param parser converts and validates the typed text
-     * @return the valid value
+     * @return the date
+     * @throws InputClosedException if the standard input is closed
      */
-    private <T> T readUntilValid(String prompt, Parser<T> parser) {
+    public LocalDate readDate(String prompt) {
         while (true) {
             String text = readLine(prompt);
             try {
-                return parser.parse(text);
-            } catch (ValidationException e) {
-                printer.printWarning(e.getMessage());
+                return LocalDate.parse(text.trim());
+            } catch (DateTimeParseException e) {
+                printer.printWarning("Enter a valid date as yyyy-MM-dd (for example 2027-03-15).");
             }
+        }
+    }
+
+    /**
+     * Prompts until the user types a whole number within a range.
+     *
+     * @param prompt  the text asking for the value
+     * @param min     the lowest accepted number
+     * @param max     the highest accepted number
+     * @param message the message shown if the text is not valid
+     * @return the number
+     * @throws InputClosedException if the standard input is closed
+     */
+    private int readNumber(String prompt, int min, int max, String message) {
+        while (true) {
+            String text = readLine(prompt);
+            try {
+                int number = Integer.parseInt(text.trim());
+                if (number >= min && number <= max) {
+                    return number;
+                }
+            } catch (NumberFormatException e) {
+                // Not a number: the message below is shown.
+            }
+            printer.printWarning(message);
         }
     }
 
@@ -184,44 +151,6 @@ public class ConsoleInput {
             return scanner.nextLine();
         } catch (NoSuchElementException e) {
             throw new InputClosedException(e);
-        }
-    }
-
-    /**
-     * Converts a text into a whole number within a range.
-     *
-     * @param text    the typed text
-     * @param min     the lowest accepted number
-     * @param max     the highest accepted number
-     * @param message the message shown if the text is not valid
-     * @return the number
-     * @throws ValidationException if the text is not a number in the range
-     */
-    private static int parseInt(String text, int min, int max, String message) throws ValidationException {
-        int number;
-        try {
-            number = Integer.parseInt(text.trim());
-        } catch (NumberFormatException e) {
-            throw new ValidationException(message, e);
-        }
-        if (number < min || number > max) {
-            throw new ValidationException(message);
-        }
-        return number;
-    }
-
-    /**
-     * Converts a text in {@code yyyy-MM-dd} format into a date.
-     *
-     * @param text the typed text
-     * @return the date
-     * @throws ValidationException if the text is not a valid date
-     */
-    private static LocalDate parseDate(String text) throws ValidationException {
-        try {
-            return LocalDate.parse(text.trim());
-        } catch (DateTimeParseException e) {
-            throw new ValidationException(DATE_FORMAT_MESSAGE, e);
         }
     }
 }
